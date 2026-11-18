@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Calculadora interativa de transformações e invariantes de Lorentz.">
+  <title>Lorentz Calculator</title>
+  <style>
+    :root { color-scheme: light; --ink: #172033; --muted: #596579; --line: #d7deea; --paper: #fff; --wash: #f3f6fb; --blue: #2457d6; --green: #137547; --red: #b42318; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--wash); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+    main { width: min(1050px, calc(100% - 32px)); margin: 36px auto 64px; }
+    header { margin-bottom: 24px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 5vw, 2.6rem); letter-spacing: -.03em; }
+    h2 { margin: 0 0 14px; font-size: 1.15rem; }
+    p { margin: 6px 0; color: var(--muted); }
+    .card { margin: 16px 0; padding: 22px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 16px #17203308; }
+    .equation { overflow-x: auto; margin: 14px 0; padding: 12px 16px; border-radius: 8px; background: var(--wash); font: 1.05rem Georgia, serif; white-space: nowrap; }
+    .row { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; }
+    label { display: grid; gap: 5px; color: var(--muted); font-size: .9rem; }
+    input { width: 100%; min-width: 74px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: white; font: inherit; }
+    input:focus { outline: 3px solid #2457d633; border-color: var(--blue); }
+    .beta label { width: 105px; }
+    button { border: 0; border-radius: 8px; padding: 10px 15px; background: var(--blue); color: #fff; font: inherit; font-weight: 650; cursor: pointer; }
+    button.secondary { background: #e8edf7; color: var(--ink); }
+    button:hover { filter: brightness(.94); }
+    .matrix-wrap { overflow-x: auto; }
+    table { border-collapse: separate; border-spacing: 6px; }
+    th { padding: 3px 8px; color: var(--muted); font-weight: 600; }
+    td input { width: 112px; min-width: 92px; text-align: right; font-variant-numeric: tabular-nums; }
+    .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 16px; }
+    .result { padding: 14px; background: var(--wash); border-radius: 9px; }
+    .result strong { display: block; margin-bottom: 3px; }
+    .good { color: var(--green); font-weight: 700; }
+    .bad { color: var(--red); font-weight: 700; }
+    .small { font-size: .88rem; }
+    code { color: #243b72; }
+    @media (max-width: 560px) { .card { padding: 16px; } td input { width: 88px; min-width: 78px; padding: 8px 5px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>⚛️ Lorentz Calculator</h1>
+      <p>Gere uma transformação de Lorentz por boost ou edite a matriz e verifique numericamente seus invariantes.</p>
+      <div class="equation" aria-label="Condição de Lorentz">η = diag(1, −1, −1, −1) &nbsp; · &nbsp; ΛᵀηΛ = η &nbsp; · &nbsp; s² = XᵀηX = (ct)² − x² − y² − z²</div>
+    </header>
+
+    <section class="card" aria-labelledby="boost-title">
+      <h2 id="boost-title">1. Gerar boost (unidades naturais, c = 1)</h2>
+      <p class="small">Informe a velocidade β = v/c. A convenção usada é ct′ = γ(ct − β·x).</p>
+      <div class="row beta" style="margin-top:14px">
+        <label>βₓ <input id="bx" type="number" step="any" value="0.3"></label>
+        <label>βᵧ <input id="by" type="number" step="any" value="0.2"></label>
+        <label>β𝓏 <input id="bz" type="number" step="any" value="0.1"></label>
+        <button id="generate">Gerar matriz</button>
+      </div>
+      <p id="boost-error" class="bad" role="alert" hidden></p>
+    </section>
+
+    <section class="card" aria-labelledby="matrix-title">
+      <h2 id="matrix-title">2. Matriz Λ (editável)</h2>
+      <p class="small">Linhas e colunas na ordem (ct, x, y, z). Edite qualquer elemento e escolha “Verificar”.</p>
+      <div class="matrix-wrap"><table aria-label="Matriz de transformação de Lorentz"><thead><tr><th></th><th>ct</th><th>x</th><th>y</th><th>z</th></tr></thead><tbody id="matrix"></tbody></table></div>
+      <div class="row" style="margin-top:10px">
+        <button id="verify">Verificar invariantes</button>
+        <button id="reset" class="secondary">Restaurar boost inicial</button>
+        <label>Tolerância numérica <input id="tolerance" type="number" min="0" step="any" value="1e-10"></label>
+      </div>
+      <div id="matrix-results" class="result-grid" aria-live="polite"></div>
+    </section>
+
+    <section class="card" aria-labelledby="event-title">
+      <h2 id="event-title">3. Verificar intervalo de um quadrivetor</h2>
+      <p class="small">Compare s² antes e depois da transformação X′ = ΛX.</p>
+      <div class="row" style="margin-top:14px">
+        <label>ct <input id="ct" type="number" step="any" value="2"></label>
+        <label>x <input id="x" type="number" step="any" value="1"></label>
+        <label>y <input id="y" type="number" step="any" value="0.5"></label>
+        <label>z <input id="z" type="number" step="any" value="0.25"></label>
+        <button id="check-event" class="secondary">Calcular intervalo</button>
+      </div>
+      <div id="event-results" class="result-grid" aria-live="polite"></div>
+    </section>
+    <p class="small">Todos os cálculos usam aritmética de ponto flutuante JavaScript (IEEE 754); a tolerância acomoda erros de arredondamento.</p>
+  </main>
+  <script>
+    'use strict';
+    const $ = (id) => document.getElementById(id);
+    const eta = [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, -1]];
+    const indices = ['t', 'x', 'y', 'z'];
+    let lastGenerated = null;
+
+    function renderMatrix(matrix) {
+      $('matrix').innerHTML = matrix.map((row, i) => `<tr><th>${indices[i]}</th>${row.map((value, j) => `<td><input aria-label="Lambda ${indices[i]}, ${indices[j]}" data-row="${i}" data-col="${j}" type="number" step="any" value="${value.toPrecision(12)}"></td>`).join('')}</tr>`).join('');
+    }
+    function readMatrix() {
+      return Array.from({ length: 4 }, (_, i) => Array.from({ length: 4 }, (_, j) => {
+        const value = Number($('matrix').querySelector(`[data-row="${i}"][data-col="${j}"]`).value);
+        if (!Number.isFinite(value)) throw new Error('Preencha todos os elementos da matriz com números finitos.');
+        return value;
+      }));
+    }
+    function multiply(a, b) {
+      return a.map((row, i) => b[0].map((_, j) => row.reduce((sum, value, k) => sum + value * b[k][j], 0)));
+    }
+    function transpose(a) { return a[0].map((_, j) => a.map(row => row[j])); }
+    function boost(beta) {
+      const b2 = beta.reduce((sum, value) => sum + value * value, 0);
+      if (!Number.isFinite(b2) || b2 >= 1) throw new Error('A magnitude da velocidade deve satisfazer |β| < 1.');
+      const gamma = 1 / Math.sqrt(1 - b2);
+      const result = Array.from({ length: 4 }, (_, i) => Array.from({ length: 4 }, (_, j) => i === j ? 1 : 0));
+      result[0][0] = gamma;
+      for (let i = 0; i < 3; i++) {
+        result[0][i + 1] = -gamma * beta[i];
+        result[i + 1][0] = -gamma * beta[i];
+        for (let j = 0; j < 3; j++) {
+          result[i + 1][j + 1] += b2 === 0 ? 0 : (gamma - 1) * beta[i] * beta[j] / b2;
+        }
+      }
+      return result;
+    }
+    function determinant(matrix) {
+      const a = matrix.map(row => row.slice());
+      let det = 1;
+      for (let i = 0; i < 4; i++) {
+        let pivot = i;
+        for (let r = i + 1; r < 4; r++) if (Math.abs(a[r][i]) > Math.abs(a[pivot][i])) pivot = r;
+        if (Math.abs(a[pivot][i]) < Number.EPSILON) return 0;
+        if (pivot !== i) { [a[pivot], a[i]] = [a[i], a[pivot]]; det *= -1; }
+        const p = a[i][i]; det *= p;
+        for (let r = i + 1; r < 4; r++) {
+          const factor = a[r][i] / p;
+          for (let c = i + 1; c < 4; c++) a[r][c] -= factor * a[i][c];
+        }
+      }
+      return det;
+    }
+    function format(value) { return Number(value).toExponential(6); }
+    function tolerance() {
+      const t = Number($('tolerance').value);
+      if (!Number.isFinite(t) || t < 0) throw new Error('A tolerância deve ser um número finito não negativo.');
+      return t;
+    }
+    function verify() {
+      const matrix = readMatrix();
+      const tol = tolerance();
+      const actual = multiply(multiply(transpose(matrix), eta), matrix);
+      let maxError = 0;
+      actual.forEach((row, i) => row.forEach((value, j) => { maxError = Math.max(maxError, Math.abs(value - eta[i][j])); }));
+      const det = determinant(matrix);
+      const valid = maxError <= tol;
+      $('matrix-results').innerHTML = `<div class="result"><strong>Condição ΛᵀηΛ = η</strong><span class="${valid ? 'good' : 'bad'}">${valid ? 'Satisfeita' : 'Não satisfeita'}</span><div class="small">Erro máximo |ΛᵀηΛ − η|: ${format(maxError)}</div></div><div class="result"><strong>Determinante det(Λ)</strong>${format(det)}<div class="small">Para uma transformação de Lorentz, det(Λ) = ±1.</div></div><div class="result"><strong>Métrica calculada ΛᵀηΛ</strong><div class="small">${actual.map(row => `[${row.map(format).join(', ')}]`).join('<br>')}</div></div>`;
+      return matrix;
+    }
+    function generate() {
+      try {
+        $('boost-error').hidden = true;
+        const beta = ['bx', 'by', 'bz'].map(id => Number($(id).value));
+        if (beta.some(value => !Number.isFinite(value))) throw new Error('Informe valores numéricos finitos para β.');
+        lastGenerated = boost(beta);
+        renderMatrix(lastGenerated);
+        verify();
+      } catch (error) { $('boost-error').textContent = error.message; $('boost-error').hidden = false; }
+    }
+    function checkEvent() {
+      try {
+        const matrix = readMatrix();
+        const vector = ['ct', 'x', 'y', 'z'].map(id => Number($(id).value));
+        if (vector.some(value => !Number.isFinite(value))) throw new Error('Informe componentes finitas para o quadrivetor.');
+        const transformed = matrix.map(row => row.reduce((sum, value, i) => sum + value * vector[i], 0));
+        const interval = v => v[0] ** 2 - v[1] ** 2 - v[2] ** 2 - v[3] ** 2;
+        const before = interval(vector), after = interval(transformed), delta = Math.abs(after - before);
+        const valid = delta <= tolerance() * Math.max(1, Math.abs(before));
+        $('event-results').innerHTML = `<div class="result"><strong>Intervalo original s²</strong>${format(before)}</div><div class="result"><strong>Intervalo transformado s′²</strong>${format(after)}</div><div class="result"><strong>Diferença absoluta</strong><span class="${valid ? 'good' : 'bad'}">${format(delta)} — ${valid ? 'invariante dentro da tolerância' : 'diferença acima da tolerância'}</span><div class="small">X′ = (${transformed.map(format).join(', ')})</div></div>`;
+      } catch (error) { $('event-results').innerHTML = `<div class="result bad" role="alert">${error.message}</div>`; }
+    }
+    $('generate').addEventListener('click', generate);
+    $('verify').addEventListener('click', () => { try { verify(); } catch (error) { $('matrix-results').innerHTML = `<div class="result bad" role="alert">${error.message}</div>`; } });
+    $('reset').addEventListener('click', () => { if (lastGenerated) { renderMatrix(lastGenerated); verify(); } });
+    $('check-event').addEventListener('click', checkEvent);
+    generate();
+    checkEvent();
+  </script>
+</body>
+</html>
